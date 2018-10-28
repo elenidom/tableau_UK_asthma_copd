@@ -2,9 +2,8 @@ Chronic Obstructive Pulmonary Disease (COPD) and asthma are inflammatory chronic
 
 This report accompanies two interactive dashboards for COPD and asthma for two distinct stakeholder groups; citizens and executives. It has been structured to emphasize how the development stages of visualization tools are inextricably linked to the audiences’ expectations, drawing evidence from the literature and personal experience. 
 Two different approaches of dashboards are commented:
-
-	- the first focuses on citizens’ requirements and highlights the impact of air quality and smoking on COPD and asthma hospital readmissions; 
-	- the second focuses on executive’s requirements, underlining prescription costs of asthma and COPD around England and showing that the 
+- the first focuses on citizens’ requirements and highlights the impact of air quality and smoking on COPD and asthma hospital readmissions; 
+- the second focuses on executive’s requirements, underlining prescription costs of asthma and COPD around England and showing that the 
 North is the most problematic region with prescription costs for 2012 over £197 million. 
 
 The dashboards have been developed using free of charge, population data from the NHS Digital and other governmental sources.
