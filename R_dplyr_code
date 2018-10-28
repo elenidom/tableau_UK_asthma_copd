@@ -1,0 +1,94 @@
+#Loading the package
+library(dplyr) #data manipulation package - needs to be installed on PC before loading
+
+##See the dplyr cheat sheet on Blackboard for more information on this useful package
+
+#set working directory to file location of stored datasets: go to session->set working directory->choose directory
+
+##Load in the dataset - stored as CSV file. NB: All excel files must be in CSV format to be loaded into R
+#QoF.dat is a data frame (a vector of vectors)
+QoF.Dat <- read.csv(file="COPDQoF Simplified.csv")
+View(QoF.Dat)
+
+#Link GP Practice Data to Lon/Lat data through postcode
+GPPracticeDat <- read.csv(file="gppracticedataPostcodeFixed.csv")
+LonLatDat <- read.csv(file="codePointGP_wgs84.csv")
+
+sum(GPPracticeDat$Postcode%in%LonLatDat$Postcode==FALSE) #number of postcodes within the GP practice data that arent in the lon/lat data
+
+#GPPracticeDat <- GPPracticeDat %>% left_join(LonLatDat, by="Postcode") #the %>% command is shorthand notation - called piping
+GPPracticeDat <- left_join(GPPracticeDat,LonLatDat, by="Postcode") #equivalent to line above
+#turning characters back to a factor -> GPPracticeDat and LonLatDat do not have the same amount of variables, hence warning message
+GPPracticeDat$Postcode <- as.factor(GPPracticeDat$Postcode)
+View(GPPracticeDat)
+
+summary(GPPracticeDat) #number of NA X and Y variables should equal sum(GPPracticeDat$Postcode%in%LonLatDat$Postcode==FALSE)
+
+#write data to files
+write.csv(GPPracticeDat, file="GPPracWithLonLat.csv")
+
+#Link GP Data with QoF data
+
+sum(QoF.Dat$Practice.Code%in%GPPracticeDat$Practice.Code==F) #number of COPD QoF practice codes that are not in the GP practice data
+
+#QoF_With_GP_Practice_LonLat <- QoF.Dat %>% inner_join(GPPracticeDat, by="Practice.Code") #shorthand "piping" notation
+QoF_With_GP_Practice_LonLat <- inner_join(QoF.Dat,GPPracticeDat, by="Practice.Code" ) #equivalent to line above
+QoF_With_GP_Practice_LonLat$Practice.Code <- as.factor(QoF_With_GP_Practice_LonLat$Practice.Code)
+View(QoF_With_GP_Practice_LonLat)
+write.csv(QoF_With_GP_Practice_LonLat, file="QoF_With_GP_Practice_LonLat.csv")
+
+##Load in the Public Health England dataset - stored as CSV file
+PHE.Dat <- read.csv(file="PublicHealthEngland-CCG-Data.csv")
+View(PHE.Dat) #view the loaded data
+
+#this is reducing the PHE data to 2012-14; other dates do exist
+PHE.Dat <- PHE.Dat %>% filter(Time.Period=="2012/13" |
+                                Time.Period=="2013/14") %>% #we only need 2012/13 and 2013/14 data to match with QoF
+  select(-Sex, -Note) %>% #remove these columns as they do not give any further information to us
+  droplevels() #remove levels of factors with zero frequency
+View(PHE.Dat)
+
+#changing format of PHE data - currently in "long" format, we need in wide format to match format of QoF data
+#Split into two time periods to make the transformation easier
+EarlyDat <- PHE.Dat %>% filter(Time.Period=="2012/13")
+LateDat <- PHE.Dat %>% filter(Time.Period=="2013/14")
+
+EarlyWidePHE.dat <- reshape(EarlyDat, v.names=c("Value", "Lower.CI", "Upper.CI"), 
+                            timevar=c("Indicator"), idvar="Area.Name", 
+                            drop=c("Time.Period", "Age", "Count", "Denominator"),
+                            direction="wide")
+dim(EarlyWidePHE.dat)
+View(EarlyWidePHE.dat)
+#Add the time period to each name to distinguish from the 2013/14 dataset (i.e. indicate the year in which the value corresponds)
+names(EarlyWidePHE.dat) <- c(names(EarlyWidePHE.dat)[1:4], paste(names(EarlyWidePHE.dat)[-c(1:4)], "2012/13", sep=" "))
+View(EarlyWidePHE.dat)
+
+LateWidePHE.dat <- reshape(LateDat, v.names=c("Value", "Lower.CI", "Upper.CI"), 
+                           timevar=c("Indicator"), idvar="Area.Name", 
+                           drop=c("Time.Period", "Age", "Count", "Denominator"),
+                           direction="wide")
+#As above - add 2013/14 to the names of the dataset
+names(LateWidePHE.dat) <- c(names(LateWidePHE.dat)[1:4], paste(names(LateWidePHE.dat)[-c(1:4)], "2013/14", sep=" "))
+View(LateWidePHE.dat)
+
+#joining the two year time periods datasets back together together
+WidePHE.dat <- left_join(EarlyWidePHE.dat, LateWidePHE.dat, by=c("Parent.Code", "Parent.Name", "Area.Code","Area.Name"))
+View(WidePHE.dat)
+#replace Area.Name header with CCG name header to match that in QOF
+WidePHE.dat <- WidePHE.dat %>% rename("CCG.Name" = Area.Name)
+
+write.csv(WidePHE.dat, file="WidePHEData.csv")
+
+#Link with QoF_With_GP_Practice_LonLat
+
+sum(QoF_With_GP_Practice_LonLat$CCG.Name%in%WidePHE.dat$CCG.Name==FALSE) #number of qof CCG names that aren't in PHE dataset
+#highlights the problems with linking by a name:
+QoF_With_GP_Practice_LonLat$CCG.Name[which(QoF_With_GP_Practice_LonLat$CCG.Name%in%WidePHE.dat$CCG.Name==FALSE)]
+#e.g. NHS AIREDALE, WHARFEDALE AND CRAVEN CCG in QoF data is spelt as NHS AIREDALE, WHARFDALE AND CRAVEN CCG in PHE so wont link!!
+
+FullData <- QoF_With_GP_Practice_LonLat %>% left_join(WidePHE.dat, by="CCG.Name")
+FullData$CCG.Name <- as.factor(FullData$CCG.Name)
+View(FullData)
+dim(FullData)
+
+write.csv(FullData, file="FullData.csv")
